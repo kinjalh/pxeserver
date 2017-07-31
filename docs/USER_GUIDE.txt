@@ -1,0 +1,30 @@
+USER GUIDE:
+
+to run project:
+go to project's root directory, and then:
+gradlew run
+
+
+to run distZip:
+
+unzip the zip file.	Go into the 'bin' directory inside the unzipped project directory. to run the batch file,
+type the name of the batch file in the command line and press enter.
+
+Configuration files are included in the 'conf' folder. There are some short comments explaining the data fields.
+For a more in-depth explanation, check "useful links" at bottom of page.
+
+
+logging:
+In order to ensuer that log4j logs to log folder relative to application home, make sure to run from project home
+directory.
+
+USEFUL LINKS:
+
+Intel PXE specification version 2.1, contains the protocol specs and some explanation of the options
+http://www.pix.net/software/pxeboot/archive/pxespec.pdf
+
+DHCP options with RFC link for every single option:
+https://www.iana.org/assignments/bootp-dhcp-parameters/bootp-dhcp-parameters.xhtml
+
+Vendor options RFC:
+https://tools.ietf.org/html/rfc3925

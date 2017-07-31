@@ -1,0 +1,363 @@
+package org.kj.pxe.protocol.impl;
+
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.kj.pxe.config.DhcpSettings;
+import org.kj.pxe.protocol.DhcpDiscoverPacket;
+import org.kj.pxe.protocol.DhcpOfferPacket;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * An object that represents a DHCP Ack packet.
+ * 
+ * @author Kinjal
+ *
+ */
+class DhcpOfferPacketImpl extends AbstractDhcpPacketImpl implements DhcpOfferPacket {
+
+	private static Logger logger = LoggerFactory.getLogger(DhcpOfferPacketImpl.class);
+	private DhcpSettings settings;
+
+	DhcpOfferPacketImpl(DhcpSettings settings) {
+		this.settings = settings;
+	}
+
+	/**
+	 * Sets the data fields of this DHCP Offer packet so that it responds to the
+	 * given discover packet. The next server IP address, siaddr, is set to the
+	 * IP address of this machine (local host).
+	 * 
+	 * @param request
+	 *            the request packet using which this offer packet is built
+	 */
+	@Override
+	public void buildOffer(DhcpDiscoverPacket discover) {
+
+		try {
+			setOp(DhcpOpField.BOOTREPLY);
+			setHtype(discover.getHtype());
+			setHlen(discover.getHlen());
+			setHops((byte) 0);
+
+			setXid(discover.getXid());
+
+			setSecs(discover.getSecs());
+			setFlags(discover.getFlags());
+
+			setCiaddr(InetAddress.getByName("0.0.0.0"));
+			setYiaddr(InetAddress.getByName("0.0.0.0"));
+			// NEXT SERVER ADDRESS MUST BE OF THIS MACHINE
+			setSiaddr(InetAddress.getLocalHost());
+			setGiaddr(discover.getGiaddr());
+
+			setChaddr(discover.getChaddr());
+
+			setSname(discover.getSname());
+
+			setFile(settings.getBootFileName());
+
+			setMagicCookie(discover.getMagicCookie());
+			logger.debug("set magic cookie to: " + Arrays.toString(getMagicCookie()));
+
+			List<DhcpOption> options = new ArrayList<DhcpOption>();
+			DhcpOption messageTypeOption = new DhcpOption((short) DhcpOptionTag.DHCP_MESSAGE_TYPE_TAG.getValue(),
+					(short) 1, new byte[] { (byte) DhcpMessageTypeValue.DHCPOFFER.getValue() });
+			options.add(messageTypeOption);
+
+			DhcpOption serverIdOption = new DhcpOption((short) DhcpOptionTag.SERVER_ID.getValue(), (short) 4, getSiaddr().getAddress());
+			options.add(serverIdOption);
+
+			for (int i = 0; i < discover.getOptions().size(); ++i) {
+				if (discover.getOptions().get(i).getTag() == DhcpOptionTag.VENDOR_CLASS_IDENTIFIER.getValue()) {
+					options.add(discover.getOptions().get(i));
+				}
+			}
+
+			for (DhcpOption option : discover.getOptions()) {
+				if (option.getTag() == DhcpOptionTag.CLIENT_IDENTIFIER.getValue()) {
+					options.add(option);
+				}
+			}
+
+			for (DhcpOption option : discover.getOptions()) {
+				if (option.getTag() == DhcpOptionTag.USER_CLASS.getValue()) {
+
+					String str = new String(option.getData());
+					logger.debug("GOT OPTION " + option.getTag() + " WITH DATA " + Arrays.toString(option.getData()));
+
+					if (str.toLowerCase().contains("ipxe") || str.toLowerCase().contains("gpxe")) {
+
+						VendorOptions vendorOption = new VendorOptions();
+
+						PxeDiscoveryControlSuboption dis = new PxeDiscoveryControlSuboption(
+								settings.getVendorOptionDiscoveryControl());
+						vendorOption.getSuboptions().add(dis);
+
+						List<BootServerInformation> serverList = new ArrayList<BootServerInformation>();
+						List<InetAddress> serverAddrs = new ArrayList<InetAddress>();
+						serverAddrs.add(InetAddress.getLocalHost());
+						BootServerInformation sInfo = new BootServerInformation((short) 0, serverAddrs); // ipxe
+																											// hack
+						serverList.add(sInfo);
+						PxeBootServersSuboption servers = new PxeBootServersSuboption(serverList);
+						vendorOption.getSuboptions().add(servers);
+
+						String str1 = settings.getVendorOptionBootMenu();
+						List<BootMenuInformation> menuInfo = new ArrayList<BootMenuInformation>();
+						BootMenuInformation info = new BootMenuInformation(
+								Short.parseShort(str1.substring(0, str1.indexOf(',')).trim()),
+								str1.substring(str1.indexOf(',') + 1).trim());
+						menuInfo.add(info);
+						PxeBootMenuSuboption menu = new PxeBootMenuSuboption(menuInfo);
+						vendorOption.getSuboptions().add(menu);
+
+						PxeMenuPromptSuboption prompt = new PxeMenuPromptSuboption((byte) 10,
+								settings.getVendorOptionMenuPrompt());
+						vendorOption.getSuboptions().add(prompt);
+
+						short[] arr = settings.getVendorOptionBootItem();
+						PxeBootItemSuboption item = new PxeBootItemSuboption(arr[0], arr[1]);
+						vendorOption.getSuboptions().add(item);
+
+						PxeEndSuboption end = new PxeEndSuboption();
+						vendorOption.getSuboptions().add(end);
+
+						options.add(vendorOption);
+					}
+				}
+			}
+
+			DhcpOption endOption = new DhcpOption((short) DhcpOptionTag.END.getValue(), (short) 0, new byte[] {});
+			options.add(endOption);
+
+			setOptions(options);
+
+		} catch (IOException e) {
+			throw new DhcpPacketConstructionException(e);
+		}
+	}
+
+	/**
+	 * Reads the packet data from a byte array. This assumes that the bytes
+	 * represent the data fields as specified by <a> href="RFC
+	 * 2131">https://www.ietf.org/rfc/rfc2131.txt</a>.
+	 * 
+	 * @param buf
+	 *            the byte array to read from
+	 * @throws DhcpParsingException
+	 *             if the opCode is the wrong value.
+	 */
+	@Override
+	public void readFromBytes(byte[] buf) {
+		ByteArrayInputStream bis = new ByteArrayInputStream(buf);
+		DataInputStream dataStream = new DataInputStream(bis);
+
+		// Check to make sure that opCode is 2
+		try {
+			byte opCode = dataStream.readByte();
+			if (opCode != DhcpOpField.BOOTREPLY.getValue()) {
+				logger.error("Threw exception because Offer packet opCode was not 2.");
+				throw new DhcpParsingException("Offer packet opCode must be 2.");
+			}
+			logger.debug("op: " + DhcpOpField.BOOTREPLY.getValue());
+			setOp(DhcpOpField.BOOTREPLY);
+
+			// read hardware type (1 byte)
+			byte htype = dataStream.readByte();
+			setHtype(htype);
+			logger.debug("hardware type: " + htype);
+
+			// read hardware address length (1 byte)
+			byte hlen = dataStream.readByte();
+			setHlen(hlen);
+			logger.debug("hardware address length: " + hlen);
+
+			// read hop count (1 byte)
+			byte hops = dataStream.readByte();
+			setHops(hops);
+			logger.debug("hop count: " + hops);
+
+			// read transaction id (4 bytes) and save as string
+			int xid = dataStream.readInt();
+			setXid(xid);
+			logger.debug("transaction id: " + String.format("%08x", xid));
+
+			// read number of seconds (2 bytes)
+			short secs = dataStream.readShort();
+			setSecs(secs);
+			logger.debug("number of seconds: " + Short.toUnsignedInt(secs));
+
+			// read flags (2 bytes)
+			short flags = dataStream.readShort();
+			setFlags(flags);
+			logger.debug("flags: " + Short.toUnsignedInt(flags));
+
+			// read client ip address (4 bytes)
+			byte[] ciaddrNums = new byte[4];
+			dataStream.read(ciaddrNums);
+			InetAddress ciaddr = InetAddress.getByAddress(ciaddrNums);
+			setCiaddr(ciaddr);
+			logger.debug("client ip address: " + ciaddr.toString().substring(1));
+
+			// read your ip address (4 bytes)
+			byte[] yiaddrNums = new byte[4];
+			dataStream.read(yiaddrNums);
+			InetAddress yiaddr = InetAddress.getByAddress(yiaddrNums);
+			setYiaddr(yiaddr);
+			logger.debug("your ip address: " + yiaddr.toString().substring(1));
+
+			// read server ip address (4 bytes)
+			byte[] siaddrNums = new byte[4];
+			dataStream.read(siaddrNums);
+			InetAddress siaddr = InetAddress.getByAddress(siaddrNums);
+			setSiaddr(siaddr);
+			logger.debug("server ip address: " + siaddr.toString().substring(1));
+
+			// read gateway ip address (4 bytes)
+			byte[] giaddrNums = new byte[4];
+			dataStream.read(giaddrNums);
+			InetAddress giaddr = InetAddress.getByAddress(giaddrNums);
+			setGiaddr(giaddr);
+			logger.debug("gateway ip address: " + giaddr.toString().substring(1));
+
+			// read client hardware address (16 bytes)
+			byte[] chaddr = new byte[16];
+			dataStream.read(chaddr);
+			setChaddr(chaddr);
+			String hexString = "";
+			for (int i = 0; i < chaddr.length; ++i) {
+				hexString += String.format("%02x", chaddr[i]) + " ";
+			}
+			logger.debug("client hardware address: " + hexString);
+
+            // read server host name (64 bytes)
+            // Consider padding, String should only use values up to first null character, which is 0
+            byte[] shn = new byte[64];
+            dataStream.read(shn);
+            String serverHostName = new String(shn, 0, ParsingUtils.findByteIndex(shn, (byte)0));
+            setSname(serverHostName);
+            logger.debug("server host name: " + serverHostName);
+
+            // read boot file name (128 bytes)
+            // Consider padding, String should only use values up to first null character, which is 0
+            byte[] bfn = new byte[128];
+            dataStream.read(bfn);
+            String bootFileName = new String(bfn, 0, ParsingUtils.findByteIndex(bfn, (byte) 0));
+            setFile(bootFileName);
+            logger.debug("boot file name: " + bootFileName);
+
+			// TODO: validate magic cookie values before saving, throw exception
+			// if
+			// values are not as they should be
+			// read magic cookie
+			byte[] magicCookie = new byte[4];
+			dataStream.read(magicCookie);
+			setMagicCookie(magicCookie);
+			logger.debug("magic cookie: " + Arrays.toString(magicCookie));
+
+			// Check DHCP option 60 Class ID is set to pxe client tag
+			short tag;
+			List<DhcpOption> options = new ArrayList<DhcpOption>();
+			do {
+				tag = (short) dataStream.readUnsignedByte();
+				short len = 0;
+				byte[] data = null;
+				if (tag != DhcpOptionTag.PAD.getValue() && tag != DhcpOptionTag.END.getValue()) {
+					len = (short) dataStream.readUnsignedByte();
+					data = new byte[len];
+					dataStream.read(data);
+				}
+				DhcpOption option = new DhcpOption(tag, len, data);
+				options.add(option);
+				logger.debug(option.toString());
+			} while (tag != DhcpOptionTag.END.getValue());
+
+			validateDhcpOptions(options);
+
+			setOptions(options);
+
+		} catch (IOException e) {
+			throw new DhcpParsingException(e);
+		}
+	}
+
+	/**
+	 * Checks the DHCP options to check that the message type option (53) and
+	 * vendor class ID (60) exist. The message type option is checked to make
+	 * sure that it has length 1 and data field corresponding to DHCP Offer. The
+	 * vendor class ID is checked to make sure it contains "PXEClient:Arch:" and
+	 * "UNDI".
+	 *
+	 * @param options
+	 *            the List of options to validate
+	 * @throws DhcpTagNotFoundException
+	 *             if either the message type or the vendor class ID option are
+	 *             not found
+	 */
+	void validateDhcpOptions(List<DhcpOption> options) {
+		boolean foundDhcpMessageTypeTag = false;
+		boolean foundVendorClassIdTag = false;
+		for (DhcpOption option : options) {
+			if (option.getTag() == DhcpOptionTag.DHCP_MESSAGE_TYPE_TAG.getValue()) {
+				foundDhcpMessageTypeTag = true;
+				validateDhcpMessageTypeOption(option);
+			} else if (option.getTag() == DhcpOptionTag.VENDOR_CLASS_IDENTIFIER.getValue()) {
+				foundVendorClassIdTag = true;
+				validateDhcpVendorClassIdOption(option);
+			}
+		}
+
+		if (!foundDhcpMessageTypeTag) {
+			throw new DhcpTagNotFoundException("Missing DHCP message type tag (53)");
+		}
+		if (!foundVendorClassIdTag) {
+			throw new DhcpTagNotFoundException("Missing DHCP vendor class identification tag (60)");
+		}
+	}
+
+	/**
+	 * Checks the given option to make sure it has length 1 and its data field
+	 * is set to the value corresponding to DHCP Offer.
+	 * 
+	 * @param option
+	 *            the option to check
+	 * @throws DhcpOptionDataIncorrectException
+	 *             if either the length or the data field is not the correct
+	 *             value
+	 */
+	public void validateDhcpMessageTypeOption(DhcpOption option) throws DhcpOptionDataIncorrectException {
+		if (option.getLen() != 1) {
+			throw new DhcpOptionDataIncorrectException("DHCP Message type option must have length 1");
+		}
+		byte value = option.getData()[0];
+		if (value != DhcpMessageTypeValue.DHCPOFFER.getValue()) {
+			throw new DhcpOptionDataIncorrectException(
+					"DHCP Message type option must contain 2 as data. Got data: " + Arrays.toString(option.getData()));
+		}
+	}
+
+	/**
+	 * Checks the given option to make sure it contains "PXEClient:Arch:" and
+	 * "UNDI".
+	 * 
+	 * @param option
+	 *            the option to check
+	 * @throws DhcpOptionDataIncorrectException
+	 *             if either the length or the data field is not the correct
+	 *             value
+	 */
+	public void validateDhcpVendorClassIdOption(DhcpOption option) throws DhcpOptionDataIncorrectException {
+		String id = new String(option.getData());
+		if (!id.contains("PXEClient:Arch:") || !id.contains("UNDI")) {
+			throw new DhcpOptionDataIncorrectException(
+					"DHCP Vendor Class ID option must be in format PXEClient:Arch:xxxxx:UNDI:yyyzzz");
+		}
+	}
+}
