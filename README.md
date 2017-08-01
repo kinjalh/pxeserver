@@ -6,7 +6,7 @@ running concurrently to this proxy server. For more details, please refer to the
 inside the docs folder.
 
 Follows Intel Specification version 2.1 for PXE boot process.
-Supports ipxe and gpxe clients.
+Supports iPXE and gPXE clients.
 Supports clients whose system architecture is a nonzero value.
 
 Note that the client gets the files themselves from a tftp server. This project does not provide a tftp 
