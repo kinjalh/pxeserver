@@ -1,9 +1,90 @@
 USER GUIDE:
 
-to run project:
-go to project's root directory, and then:
-gradlew run
+PROCESS OF PXE BOOTING:
+what you'll need:
+- This proxy DHCP server
+- a pxe client in accordance with the version 2.1 pxe specification by Intel
+- a DHCP server (home router)
+- a separate TFTP server, which is not included in this project
 
+Protocol used:
+This proxy DHCP server uses the DHCP protocol to communicate with the client in a 4 stage process (standard DHCP protocol)
+
+Client broadcasts a DHCP discover, usually to port 67. The client's IP address is currently 0.0.0.0
+
+Both the home router and this DHCP proxy server respond by broadcasting a DHCP offer, usually to port 68
+- The home router gives the client an IP address, the proxy DHCP server does not. 
+
+Next, the client sends out 2 separate DHCP request messages: one is broadcast to port 67, which only the router responds to (we are not interested in this DHCP reqeuest)
+The other DHCP request is unicast to the proxy DHCP server, usually on port 4011. 
+- As a response, the proxy server unicasts a DHCP ack to the client, usually on port 4011. This redirects the client to the tftp service. From here, the client should 
+be able to fetch the boot file and boot. The boot file may need to be placed in the home directory of the tftp server.
+
+IPXE, GPXE, NONZERO CLIENT ARCHITECTURE CLIENTS:
+- Some clients may send DHCP option 77 in the DHCP disocover and DHCP request, containing a string set to "ipxe" or "gpxe" OR they may
+include DHCP option 93 (client system architecture) set to a nonzero value. In this case, the proxy server
+includes DHCP option 43, a.k.a. vendor suboptions. This DHCP option contains multiple suboptions, such as discovery control and boot servers. an ipxe or gpxe
+client may also need a different boot file name.
+
+- Depending on the initial boot (the one without an ipxe/gpxe/nonzero client architecture client), a menu may be presented allowing the user
+to boot with an ipxe or gpxe client. Selecting either of these options starts another full DHCP protocol, with the client containing the option
+identifying itself as an ipxe or gpxe client.
+
+
+
+RUNNING APPLICATION:
+
+CONFIGURATIONS:
+The configurations for the server are located in the 'dhcp.properties' file in the 'conf' folder
+Before running, check configurations. Brief rundown of each property and what it does:
+
+discover_port: port in which the proxy DHCP server receives a DHCP Discover from the client
+offer_port: remote port to which proxy DHCP server sends DHCP offer
+request_port: port in which the proxy DHCP server receives a DHCP reqeust from the client
+ack_port: remote port to which proxy DHCP server sends DHCP ack
+pool_count: number of threads in the fixed thread pools of the DiscoverServer and RequestServer
+boot_file_name: the name of the file that the client should boot from a tftp server
+boot_server_address: the address of the tftp server
+vendor_option_discovery_control: if vendor options are sent, this byte specifies the client's next interaction with a server
+vendor_option.pxe_boot_server: If discovery control is set to value 7, then the IP address here is interpreted by the client as the tftp server address.
+vendor_option.pxe_boot_menu: if vendor options are sent, this allows a message to be displayed by the client
+vendor_option_menu_prompt: a message displayed after the boot menu option
+vendor_option.pxe_boot_item: server type and layer, see specification for a more detailed explanation
+ipxe_boot_file_name: the boot file name to send if the client is an ipxe client
+gpxe_boot_file_name: the boot file name to send if the client is a gpxe client
+option_93_boot_file_name: the boot file name to send if the client's DHCP option 93 identifies it's system architecture as a nonzero value
+ipxe_offer_to_tftp_redirect: if turned "on", the dhcp offer sent by the proxy server redirects the client to tftp, thus skipping the dhcp request and dhcp ack 
+
+THINGS TO MAKE SURE BEFORE RUNNING:
+- This and the home router are the only DHCP servers/proxy servers running. 
+Any other DHCP service may give the client packets that conflict with those sent by this server.
+
+- The boot file should be placed in the home directory of the tftp server.
+
+GRADLE NOTES:
+This project uses gradle version 4.0.1
+If you have a different version of gradle, use the wrapper
+instructions found here:
+https://docs.gradle.org/3.3/userguide/gradle_wrapper.html
+
+TO RUN:
+- go to home directory of pxeserver (from command line)
+gradlew run
+- this builds and runs server
+
+TO RUN TESTS:
+- got to home directory of pxeserver (from command line)
+gradlew test
+
+
+
+DISTRIBUTIONS:
+
+BUILD A DISTRIBUTION ZIP FILE (distZip):
+go to project's root directory
+gradlew distZip
+
+The distZip will be located in 'build/distributions'
 
 to run distZip:
 
@@ -14,9 +95,10 @@ Configuration files are included in the 'conf' folder. There are some short comm
 For a more in-depth explanation, check "useful links" at bottom of page.
 
 
-logging:
+LOGGING:
 In order to ensuer that log4j logs to log folder relative to application home, make sure to run from project home
-directory.
+directory. If you do not, then the folder and file name to log to (specified in log4j.properties) won't be used by the
+logger, forcing you to go to log4j.properties and specifying the exact path name to wherever you want to log.
 
 USEFUL LINKS:
 

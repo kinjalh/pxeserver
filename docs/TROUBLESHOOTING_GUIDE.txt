@@ -6,12 +6,12 @@ Wireshark was used for packet capture.
 
 ISSUE: DHCP request packet is not being sent to 4011, only is being broadcasted to port 67 (which the router, not the proxy DHCP server, responds to)
 
-If client is not an ipxe or gpxe client:
+SERVER ADDRESSES IN DHCP OFFER:
 	The DHCP offer sent has a server address specified in siaddr (a.k.a. next server address), which
 	is set to the IP address of the proxy server's machine. There is also a Server ID option (DHCP option 54).
 	Check to make sure that in the DHCP offer, this is also set to the Proxy DHCP server's address.
 
-if client is ipxe or gpxe client:
+IPXE CLIENT PARTIAL PROTOCOL:
 	
 	If in the configuration file, the DHCP Offer is supposed to redirect the client to the TFTP server:
 	
@@ -26,3 +26,8 @@ if client is ipxe or gpxe client:
 	In the DHCP offer's vendor options, discovery control should be set to 7 and the boot servers suboption should have type 0 and
 	the address of the  Proxy DHCP server. The DHCP server ID option should be set to the Proxy DHCP server's address. The siaddr should
 	also be set to the proxy DHCP server's address.
+	
+IF YOU ARE UNEXPECTEDLY HAVING PARTIAL PROTOCOL (client not sending a request):
+ipxe source code requires that the DHCP offer be sent from port 67 to port 68 and the DHCP ack be sent from port 4011 to port 4011.
+I.E. the source port matters. From your packet capture, make sure that the source ports for the offer and ack are as described above.
+	
