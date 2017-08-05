@@ -30,4 +30,44 @@ IPXE CLIENT PARTIAL PROTOCOL:
 IF YOU ARE UNEXPECTEDLY HAVING PARTIAL PROTOCOL (client not sending a request):
 ipxe source code requires that the DHCP offer be sent from port 67 to port 68 and the DHCP ack be sent from port 4011 to port 4011.
 I.E. the source port matters. From your packet capture, make sure that the source ports for the offer and ack are as described above.
+
+TESTING RESULTS:
+
+Notes:
+DHCP Proxy server address: 192.168.1.3
+Boot server address: 192.168.1.7
+
+
+Non ipxe/gpxe/nonzero client arch. client: no vendor options sent
+
+DHCP Offer:
+siaddr set to 192.168.1.3
+server id option: 192.168.1.7
+
+result: client did not send DHCP request to proxy.
+
+DHCP Offer:
+siaddr set to 192.168.1.3
+server id option: 192.168.1.3
+
+result: client sent DHCP request to proxy.
+
+DHCP Ack:
+siaddr: 192.168.1.3
+server id option: 192.168.1.7
+
+result: client tried to contact DHCP server for tftp
+
+DHCP Ack:
+siaddr: 192.168.1.7
+server id option: 192.168.1.7
+
+result: client error since server id option should be address of DHCP server
+
+DHCP Ack:
+siaddr: 192.168.1.7
+server id option: 192.168.1.3
+
+result: tftp carried out with tftp server, no errors
+
 	
