@@ -13,7 +13,3 @@ redirect the client to the tftp server with the correct filename.
 This was created because dnsmasq is not available on windows and isc-dhcp is not usable as a pure proxy server.
 Additionally, this is easier to configure than the aforementioned, although it is more limited. Since this is a 
 java project it is also platform independent.
-
-Note that the client gets the files themselves from a tftp server. This project does not provide a tftp 
-server, you as the user must find and configure one independently. This project, the proxy DHCP server,
-serves to redirect the client to the tftp server with the correct filename. 
