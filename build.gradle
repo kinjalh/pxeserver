@@ -11,6 +11,7 @@
 apply plugin: 'application'
 apply plugin: 'java'
 apply plugin: 'eclipse'
+apply plugin: 'jacoco'
 
 // In this section you declare where to find the dependencies of your project
 repositories {
@@ -39,6 +40,11 @@ dependencies {
 run {
     classpath += files('conf')
     println commandLine
+}
+
+// Add the conf folder to classpath while testing, else tests fail due to file not found
+test {
+	classpath += files('conf')
 }
 
 // By default, distZip does not include the 'conf' directory when creating the zip distribution. This copies the 'conf' directory
@@ -74,6 +80,15 @@ startScripts {
 javadoc {
 	destinationDir = file('docs/javadoc')
 }
+
+jacocoTestReport {
+    reports {
+        xml.enabled = true
+        html.enabled = true
+    }
+}
+
+check.dependsOn jacocoTestReport
 
 mainClassName = 'org.kj.pxe.server.ServerImpl'
 apply plugin: 'distribution'
