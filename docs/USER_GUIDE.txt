@@ -73,9 +73,14 @@ gradlew run
 - this builds and runs server
 
 TO RUN TESTS:
-- got to home directory of pxeserver (from command line)
+- go to home directory of pxeserver (from command line)
 gradlew test
 
+TEST COVERAGE:
+- go to home directory of pxeserver (from command line)
+gradlew jacocoTestReport
+
+To view the test report go to /build/reports/jacoco/test/html and open index.html
 
 
 DISTRIBUTIONS:
