@@ -14,4 +14,6 @@ This was created because dnsmasq is not available on windows and isc-dhcp is not
 Additionally, this is easier to configure than the aforementioned, although it is more limited. Since this is a 
 java project it is also platform independent.
 
-This project uses JaCoCo for test coverage. See the user guide for information on how to access or generate test coverage reports.
+This project uses JaCoCo for test coverage. Current test coverage is 72%.
+![Alt text](https://drive.google.com/file/d/1ChwgNdHXWn1chRN3QOOD2xMf8ALWKjgz/view?usp=sharing "Test Coverage Report")
+See the user guide for information on how to access or generate test coverage reports.
