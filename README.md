@@ -15,5 +15,4 @@ Additionally, this is easier to configure than the aforementioned, although it i
 java project it is also platform independent.
 
 This project uses JaCoCo for test coverage. Current test coverage is 72%.
-![Alt text](https://drive.google.com/file/d/1ChwgNdHXWn1chRN3QOOD2xMf8ALWKjgz/view?usp=sharing "Test Coverage Report")
 See the user guide for information on how to access or generate test coverage reports.
